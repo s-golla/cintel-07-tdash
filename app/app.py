@@ -1,17 +1,26 @@
-import seaborn as sns
-from faicons import icon_svg
 
-from shiny import reactive
-from shiny.express import input, render, ui
-import palmerpenguins 
+"""
+Penguins Dashboard Example using Shiny for Python
+This app demonstrates interactive filtering, summary statistics, and data visualization
+using the Palmer Penguins dataset. Comments are provided to help new team members learn Shiny for Python.
+"""
+import seaborn as sns  # For data visualization
+from faicons import icon_svg  # For icon support in UI
+from shiny import reactive  # For reactive programming
+from shiny.express import input, render, ui  # Shiny for Python UI and server logic
+import palmerpenguins  # Example dataset
 
+# Load the Palmer Penguins dataset
 df = palmerpenguins.load_penguins()
 
+# Set dashboard title and layout options
 ui.page_opts(title="Penguins dashboard", fillable=True)
 
-
+# Sidebar: filter controls for the dashboard
 with ui.sidebar(title="Filter controls"):
+    # Slider to filter by penguin mass
     ui.input_slider("mass", "Mass", 2000, 6000, 6000)
+    # Checkbox group to select penguin species
     ui.input_checkbox_group(
         "species",
         "Species",
@@ -19,6 +28,7 @@ with ui.sidebar(title="Filter controls"):
         selected=["Adelie", "Gentoo", "Chinstrap"],
     )
     ui.hr()
+    # Section for useful links and resources
     ui.h6("Links")
     ui.a(
         "GitHub Source",
@@ -47,8 +57,9 @@ with ui.sidebar(title="Filter controls"):
         target="_blank",
     )
 
-
+# Value boxes: summary statistics for filtered data
 with ui.layout_column_wrap(fill=False):
+    # Shows the number of penguins after filtering
     with ui.value_box(showcase=icon_svg("earlybirds")):
         "Total Penguins in Selection"
 
@@ -56,6 +67,7 @@ with ui.layout_column_wrap(fill=False):
         def count():
             return filtered_df().shape[0]
 
+    # Shows the average bill length
     with ui.value_box(showcase=icon_svg("ruler-horizontal")):
         "Average Bill Length (mm)"
 
@@ -63,6 +75,7 @@ with ui.layout_column_wrap(fill=False):
         def bill_length():
             return f"{filtered_df()['bill_length_mm'].mean():.1f} mm"
 
+    # Shows the average bill depth
     with ui.value_box(showcase=icon_svg("ruler-vertical")):
         "Average Bill Depth (mm)"
 
@@ -70,8 +83,9 @@ with ui.layout_column_wrap(fill=False):
         def bill_depth():
             return f"{filtered_df()['bill_depth_mm'].mean():.1f} mm"
 
-
+# Main content: plot and interactive data table
 with ui.layout_columns():
+    # Scatterplot of bill length vs bill depth, colored by species
     with ui.card(full_screen=True):
         ui.card_header("Bill Length vs Depth by Species")
 
@@ -84,6 +98,7 @@ with ui.layout_columns():
                 hue="species",
             )
 
+    # Interactive data table of penguin summary statistics
     with ui.card(full_screen=True):
         ui.card_header("Penguin Data")
 
@@ -98,12 +113,14 @@ with ui.layout_columns():
             ]
             return render.DataGrid(filtered_df()[cols], filters=True)
 
-
+# Example of including custom CSS for further UI customization
 #ui.include_css(app_dir / "styles.css")
 
-
+# Reactive calculation: filters the DataFrame based on sidebar controls
 @reactive.calc
 def filtered_df():
+    # Filter the DataFrame based on selected species and mass
     filt_df = df[df["species"].isin(input.species())]
     filt_df = filt_df.loc[filt_df["body_mass_g"] < input.mass()]
     return filt_df
+    # Filter the DataFrame based on selected species and mass
