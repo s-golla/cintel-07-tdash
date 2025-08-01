@@ -15,8 +15,8 @@ import palmerpenguins  # Example dataset
 # Load the Palmer Penguins dataset
 df = palmerpenguins.load_penguins()
 
-# Set dashboard title and layout options
-ui.page_opts(title="Penguins dashboard", fillable=True)
+# Set dashboard title and layout options, and specify favicon
+ui.page_opts(title="Penguins dashboard", fillable=True, favicon="favicon.ico")
 
 # Sidebar: filter controls for the dashboard
 with ui.sidebar(title="Filter controls"):
