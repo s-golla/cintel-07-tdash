@@ -1,12 +1,13 @@
-
 """
 Penguins Dashboard Example using Shiny for Python
 This app demonstrates interactive filtering, summary statistics, and data visualization
 using the Palmer Penguins dataset. Comments are provided to help new team members learn Shiny for Python.
 """
+import warnings
+warnings.filterwarnings("ignore", message="pkg_resources is deprecated as an API")
 import seaborn as sns  # For data visualization
 from faicons import icon_svg  # For icon support in UI
-import plotly.express as px  # For interactive charts
+  # Altair import removed, reverting to Seaborn
 from shiny import reactive  # For reactive programming
 from shiny.express import input, render, ui  # Shiny for Python UI and server logic
 import palmerpenguins  # Example dataset
@@ -86,27 +87,25 @@ with ui.layout_column_wrap(fill=False):
 
 # Main content: plot and interactive data table
 with ui.layout_columns():
-    # Scatterplot of bill length vs bill depth, colored by species
+    # Scatterplot of bill length vs bill depth, colored by species (Seaborn)
     with ui.card(full_screen=True):
         ui.card_header("Bill Length vs Depth by Species")
 
         @render.plot
         def length_depth():
-            # Create an interactive scatterplot using Plotly
+            import matplotlib.pyplot as plt
             df_plot = filtered_df()
-            fig = px.scatter(
-                df_plot,
+            fig, ax = plt.subplots(figsize=(8, 6))
+            sns.scatterplot(
+                data=df_plot,
                 x="bill_length_mm",
                 y="bill_depth_mm",
-                color="species",
-                title="Bill Length vs Depth by Species",
-                labels={
-                    "bill_length_mm": "Bill Length (mm)",
-                    "bill_depth_mm": "Bill Depth (mm)",
-                    "species": "Species"
-                },
-                hover_data=["island", "body_mass_g"]
+                hue="species",
+                ax=ax
             )
+            ax.set_title("Bill Length vs Depth by Species")
+            ax.set_xlabel("Bill Length (mm)")
+            ax.set_ylabel("Bill Depth (mm)")
             return fig
 
     # Interactive data table of penguin summary statistics
