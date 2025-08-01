@@ -6,3 +6,4 @@ pandas
 palmerpenguins
 plotly
 altair
+prophet
