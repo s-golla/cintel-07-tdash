@@ -1,7 +1,7 @@
 """
 Penguins Dashboard Example using Shiny for Python
 This app demonstrates interactive filtering, summary statistics, data visualization,
-and a new predictive analytics module using a simulated time-series.
+and a new predictive analytics module using a simulated time-series and the statsmodels library.
 """
 import warnings
 warnings.filterwarnings("ignore", message="pkg_resources is deprecated as an API")
@@ -14,16 +14,15 @@ import pandas as pd # For data manipulation
 import numpy as np # For numerical operations
 from datetime import datetime, timedelta # For generating synthetic dates
 
-# Import Prophet for time-series forecasting.
-# Note: Prophet is a powerful library for forecasting time series data.
-# It requires the data to be in a specific format with columns 'ds' and 'y'.
-from prophet import Prophet
+# Import statsmodels for time-series forecasting as an alternative to Prophet.
+# This library is a robust alternative for statistical models.
+import statsmodels.api as sm
 import matplotlib.pyplot as plt
 
 # Load the Palmer Penguins dataset
 df = palmerpenguins.load_penguins()
 
-# --- NEW: Create a synthetic time-series for forecasting ---
+# --- Create a synthetic time-series for forecasting ---
 # The original dataset is not a time-series, so we'll simulate one
 # by creating daily penguin counts over a two-year period.
 def create_synthetic_timeseries():
@@ -37,11 +36,11 @@ def create_synthetic_timeseries():
     # Add some random noise
     counts += np.random.normal(0, 10, size=len(dates))
     
-    # Create the DataFrame in the format Prophet expects
+    # Create the DataFrame in the format statsmodels expects (an index and a column)
     ts_df = pd.DataFrame({
-        'ds': dates,
         'y': counts.round().astype(int)
-    })
+    }, index=pd.to_datetime(dates))
+    
     return ts_df
 
 # Generate the synthetic time-series data once at the start
@@ -63,13 +62,13 @@ with ui.sidebar(title="Filter controls"):
     )
     ui.hr()
     
-    # --- NEW: Forecast controls ---
+    # --- Forecast controls ---
     ui.h5("Forecast Controls")
     ui.input_select(
         "model_selection",
         "Select Model",
-        {"Prophet": "Prophet"},
-        selected="Prophet"
+        {"ARIMA": "ARIMA"}, # Updated model selection
+        selected="ARIMA"
     )
     ui.input_slider(
         "forecast_horizon",
@@ -172,7 +171,7 @@ with ui.layout_columns():
             ]
             return render.DataGrid(filtered_df()[cols], filters=True)
             
-    # --- NEW: Card for the predictive analytics plot ---
+    # --- Card for the predictive analytics plot ---
     with ui.card(full_screen=True):
         ui.card_header("Penguin Count Forecast")
 
@@ -180,27 +179,34 @@ with ui.layout_columns():
         def forecast_plot():
             # Get the forecast data from the reactive expression
             forecast = forecast_data()
-
+            
+            # Check if the forecast data is not empty before plotting
+            if forecast.empty:
+                return
+            
             fig, ax = plt.subplots(figsize=(10, 6))
             
             # Plot the original synthetic data
-            ax.plot(synthetic_ts_df['ds'], synthetic_ts_df['y'], label='Historical Data', color='blue')
+            ax.plot(synthetic_ts_df.index, synthetic_ts_df['y'], label='Historical Data', color='blue')
             
             # Plot the forecast
-            ax.plot(forecast['ds'], forecast['yhat'], label='Forecast', color='orange')
+            forecast_index = pd.to_datetime(forecast.index)
+            # --- FIX: Use the correct column name 'mean' ---
+            ax.plot(forecast_index, forecast['mean'], label='Forecast', color='orange')
             
             # Plot the confidence interval
+            # --- FIX: Use the correct column names 'mean_ci_lower' and 'mean_ci_upper' ---
             ax.fill_between(
-                forecast['ds'], 
-                forecast['yhat_lower'], 
-                forecast['yhat_upper'], 
+                forecast_index, 
+                forecast['mean_ci_lower'], 
+                forecast['mean_ci_upper'], 
                 color='orange', 
                 alpha=0.2, 
                 label='Confidence Interval'
             )
             
             # Add labels and title
-            ax.set_title(f"Penguin Count Forecast for {input.forecast_horizon()} days")
+            ax.set_title(f"Penguin Count Forecast for {input.forecast_horizon()} days (ARIMA)")
             ax.set_xlabel("Date")
             ax.set_ylabel("Number of Penguins")
             ax.legend()
@@ -217,23 +223,35 @@ def filtered_df():
     filt_df = filt_df.loc[filt_df["body_mass_g"] < input.mass()]
     return filt_df
 
-# --- NEW: Reactive calculation for the forecast ---
+# --- Reactive calculation for the forecast using ARIMA ---
 @reactive.calc
 def forecast_data():
-    """Fits a Prophet model and generates a forecast."""
-    # The model works with the synthetic_ts_df, not the filtered_df,
-    # as the filtering is for a different purpose in this dashboard.
+    """Fits an ARIMA model and generates a forecast."""
+    try:
+        # Fit a simple ARIMA(1, 1, 0) model
+        model = sm.tsa.ARIMA(synthetic_ts_df['y'], order=(1, 1, 0), freq='D')
+        fitted_model = model.fit()
+
+        # Get the index for the forecast period
+        forecast_index = pd.date_range(
+            start=synthetic_ts_df.index[-1] + timedelta(days=1),
+            periods=input.forecast_horizon(),
+            freq='D'
+        )
+        
+        # Make predictions
+        forecast_result = fitted_model.get_forecast(steps=input.forecast_horizon())
+        
+        # Get the forecast and confidence intervals as a DataFrame
+        # The column names will be 'mean', 'mean_se', 'mean_ci_lower', 'mean_ci_upper'
+        forecast_df = forecast_result.summary_frame(alpha=0.05)
+        
+        # Ensure the index is correctly set for plotting
+        forecast_df.index = forecast_index
+        
+        return forecast_df
     
-    # Initialize the Prophet model
-    m = Prophet()
-    
-    # Fit the model to our synthetic time-series data
-    m.fit(synthetic_ts_df)
-    
-    # Create a future DataFrame to hold the dates for the forecast
-    future = m.make_future_dataframe(periods=input.forecast_horizon())
-    
-    # Make the predictions
-    forecast = m.predict(future)
-    
-    return forecast
+    except Exception as e:
+        print(f"Error during ARIMA forecasting: {e}")
+        # Return an empty DataFrame or a placeholder to prevent the app from crashing
+        return pd.DataFrame()

@@ -7,3 +7,4 @@ palmerpenguins
 plotly
 altair
 prophet
+statsmodels
